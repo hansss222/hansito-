@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Escena VR con Formas Geométricas</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <style>
+      body { margin: 0; overflow: hidden; }
+    </style>
+    <script>
+      AFRAME.registerComponent('grass-texture', {
+        init: function() {
+          var canvas = document.createElement('canvas');
+          canvas.width = 512;
+          canvas.height = 512;
+          var ctx = canvas.getContext('2d');
+          
+          // Fondo verde oscuro
+          ctx.fillStyle = '#1a4d2e';
+          ctx.fillRect(0, 0, 512, 512);
+          
+          // Dibujar pastos/hierba
+          ctx.strokeStyle = '#228B22';
+          ctx.lineWidth = 1;
+          for (let i = 0; i < 5000; i++) {
+            let x = Math.random() * 512;
+            let y = Math.random() * 512;
+            let height = Math.random() * 8 + 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + Math.random() * 2 - 1, y - height);
+            ctx.stroke();
+          }
+          
+          var texture = new THREE.CanvasTexture(canvas);
+          texture.magFilter = THREE.NearestFilter;
+          texture.minFilter = THREE.NearestFilter;
+          
+          this.el.getObject3D('mesh').material.map = texture;
+          this.el.getObject3D('mesh').material.needsUpdate = true;
+        }
+      });
+      
+      AFRAME.registerComponent('flame-animation', {
+        init: function() {
+          var el = this.el;
+          var startPos = el.getAttribute('position');
+          var tick = 0;
+          
+          el.sceneEl.addEventListener('tick', (event) => {
+            tick += 0.01;
+            
+            // Movimiento suave y sutil
+            var floatY = Math.sin(tick * 0.8) * 0.08;
+            var sway = Math.sin(tick * 0.5 + Math.random()) * 0.03;
+            
+            el.setAttribute('position', {
+              x: startPos.x + sway,
+              y: startPos.y + floatY,
+              z: startPos.z
+            });
+            
+            // Escala sutil (solo fluctua levemente)
+            var scale = 0.95 + Math.sin(tick * 1.2) * 0.05;
+            el.setAttribute('scale', {x: scale, y: scale, z: scale});
+          });
+        }
+      });
+
+      AFRAME.registerComponent('star-twinkle', {
+        init: function() {
+          var el = this.el;
+          var tick = 0;
+          el.sceneEl.addEventListener('tick', () => {
+            tick += 0.02;
+            var intensity = 0.5 + Math.sin(tick * 2) * 0.5;
+            el.setAttribute('light', 'intensity', intensity);
+          });
+        }
+      });
+
+      AFRAME.registerComponent('fire-toggle', {
+        init: function() {
+          var el = this.el;
+          var fireLight = document.getElementById('fire-light');
+          var fireLightRed = document.getElementById('fire-light-red');
+          var fireActive = true;
+          
+          el.addEventListener('click', function() {
+            fireActive = !fireActive;
+            console.log('Click en fogata - Estado:', fireActive ? 'ENCENDIDA' : 'APAGADA');
+            
+            var cones = el.querySelectorAll('a-cone, a-sphere');
+            cones.forEach(cone => {
+              cone.setAttribute('visible', fireActive);
+            });
+            
+            fireLight.setAttribute('intensity', fireActive ? 2 : 0);
+            fireLightRed.setAttribute('intensity', fireActive ? 1 : 0);
+          });
+        }
+      });
+
+      AFRAME.registerComponent('animal-toggle', {
+        init: function() {
+          var el = this.el;
+          var visible = true;
+          
+          setInterval(() => {
+            visible = !visible;
+            el.setAttribute('visible', visible);
+          }, 8000);
+        }
+      });
+
+      AFRAME.registerComponent('pickup-stone', {
+        init: function() {
+          var el = this.el;
+          
+          el.addEventListener('click', function() {
+            window.stonesCollected = (window.stonesCollected || 0) + 1;
+            el.setAttribute('visible', false);
+            console.log('¡Piedra recogida! Total: ' + window.stonesCollected);
+            
+            // Actualizar el contador en pantalla
+            var counterDisplay = document.getElementById('material-counter');
+            if (counterDisplay) {
+              counterDisplay.textContent = 'Piedras: ' + window.stonesCollected + ' | Ramitas: ' + (window.sticksCollected || 0) + ' | Plantas: ' + (window.plantsCollected || 0);
+            }
+          });
+        }
+      });
+
+      AFRAME.registerComponent('pickup-sticks', {
+        init: function() {
+          var el = this.el;
+          
+          el.addEventListener('click', function() {
+            window.sticksCollected = (window.sticksCollected || 0) + 1;
+            el.setAttribute('visible', false);
+            console.log('¡Ramita recogida! Total: ' + window.sticksCollected);
+            
+            // Actualizar el contador en pantalla
+            var counterDisplay = document.getElementById('material-counter');
+            if (counterDisplay) {
+              counterDisplay.textContent = 'Piedras: ' + (window.stonesCollected || 0) + ' | Ramitas: ' + window.sticksCollected + ' | Plantas: ' + (window.plantsCollected || 0);
+            }
+          });
+        }
+      });
+
+      AFRAME.registerComponent('pickup-plants', {
+        init: function() {
+          var el = this.el;
+          
+          el.addEventListener('click', function() {
+            window.plantsCollected = (window.plantsCollected || 0) + 1;
+            el.setAttribute('visible', false);
+            console.log('¡Planta recogida! Total: ' + window.plantsCollected);
+            
+            // Actualizar el contador en pantalla
+            var counterDisplay = document.getElementById('material-counter');
+            if (counterDisplay) {
+              counterDisplay.textContent = 'Piedras: ' + (window.stonesCollected || 0) + ' | Ramitas: ' + (window.sticksCollected || 0) + ' | Plantas: ' + window.plantsCollected;
+            }
+          });
+        }
+      });
+
+      AFRAME.registerComponent('day-night-toggle', {
+        init: function() {
+          var el = this.el;
+          var isDaytime = false;
+          var scene = document.querySelector('a-scene');
+          var sky = document.querySelector('a-sky');
+          var ground = document.querySelector('a-plane');
+          var sun = document.getElementById('sun-light');
+          var ambient = document.getElementById('ambient-light');
+          var moonLight = document.getElementById('moon-light');
+          var stars = document.querySelectorAll('[data-star]');
+          var fireLight = document.getElementById('fire-light');
+          var fireLightRed = document.getElementById('fire-light-red');
+          
+          el.addEventListener('click', function() {
+            isDaytime = !isDaytime;
+            
+            if (isDaytime) {
+              // Cambiar a DÍA
+              console.log('CAMBIO A DÍA');
+              sky.setAttribute('color', '#87CEEB');
+              ground.setAttribute('color', '#2d5016');
+              
+              // Mostrar sol, ocultar luna
+              if (sun) sun.setAttribute('intensity', 1.5);
+              if (moonLight) moonLight.setAttribute('intensity', 0);
+              if (ambient) ambient.setAttribute('intensity', 0.8);
+              
+              // Ocultar estrellas
+              stars.forEach(star => star.setAttribute('visible', false));
+              
+              // Reducir fuego
+              var flameCones = document.querySelectorAll('[data-flame]');
+              flameCones.forEach(flame => flame.setAttribute('visible', false));
+              if (fireLight) fireLight.setAttribute('intensity', 0.3);
+              if (fireLightRed) fireLightRed.setAttribute('intensity', 0);
+            } else {
+              // Cambiar a NOCHE
+              console.log('CAMBIO A NOCHE');
+              sky.setAttribute('color', '#0a0f1f');
+              ground.setAttribute('color', '#1a4d2e');
+              
+              // Mostrar luna, ocultar sol
+              if (sun) sun.setAttribute('intensity', 0);
+              if (moonLight) moonLight.setAttribute('intensity', 0.3);
+              if (ambient) ambient.setAttribute('intensity', 0.2);
+              
+              // Mostrar estrellas
+              stars.forEach(star => star.setAttribute('visible', true));
+              
+              // Restaurar fuego
+              var flameCones = document.querySelectorAll('[data-flame]');
+              flameCones.forEach(flame => flame.setAttribute('visible', true));
+              if (fireLight) fireLight.setAttribute('intensity', 2);
+              if (fireLightRed) fireLightRed.setAttribute('intensity', 1);
+            }
+          });
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <!-- CONTADOR DE MATERIALES EN PANTALLA -->
+    <div id="material-counter" style="position: fixed; top: 20px; left: 20px; background: rgba(0,0,0,0.7); color: #FFD700; padding: 15px 25px; border-radius: 8px; font-size: 20px; font-weight: bold; font-family: Arial, sans-serif; border: 2px solid #FFD700; z-index: 1000;">
+      Piedras: 0 | Ramitas: 0 | Plantas: 0
+    </div>
+  </head>
+  <body>
+    <a-scene background="color: #0a0a0a">
+      
+      <!-- Cursor para detectar clicks -->
+      <a-entity cursor="rayOrigin: mouse"></a-entity>
+      
+      <!-- Sonido ambiental de noche en el bosque -->
+      <a-entity 
+        sound="src: url(https://cdn.pixabay.com/download/audio/2022/03/10/audio_2f29554d7a.mp3); autoplay: true; loop: true; volume: 0.5"
+        position="0 0 0">
+      </a-entity>
+      
+      <script>
+        AFRAME.registerComponent('fire-toggle', {
+          init: function() {
+            var el = this.el;
+            var fireLight = document.getElementById('fire-light');
+            var fireLightRed = document.getElementById('fire-light-red');
+            var fireActive = true;
+            
+            el.addEventListener('click', function() {
+              fireActive = !fireActive;
+              console.log('Click en fogata - Estado:', fireActive ? 'ENCENDIDA' : 'APAGADA');
+              
+              var cones = el.querySelectorAll('a-cone, a-sphere');
+              cones.forEach(cone => {
+                cone.setAttribute('visible', fireActive);
+              });
+              
+              fireLight.setAttribute('intensity', fireActive ? 2 : 0);
+              fireLightRed.setAttribute('intensity', fireActive ? 1 : 0);
+            });
+          }
+        });
+      </script>
+      
+      <!-- Cielo de noche -->
+      <a-sky color="#0a0f1f"></a-sky>
+      
+      <!-- ESTRELLAS TITILANTES - CIELO NOCTURNO -->
+      <!-- 50 estrellas distribuidas por todo el cielo -->
+      <a-entity position="20 20 -25" data-star><a-sphere color="#FFFFFF" radius="0.1"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.8" distance="30" star-twinkle></a-light></a-entity>
+      <a-entity position="-20 22 -20" data-star><a-sphere color="#FFFFCC" radius="0.08"></a-sphere><a-light type="point" color="#FFFFCC" intensity="0.6" distance="25" star-twinkle></a-light></a-entity>
+      <a-entity position="15 25 -30" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="28" star-twinkle></a-light></a-entity>
+      <a-entity position="-15 23 -28" data-star><a-sphere color="#E6E6FA" radius="0.08"></a-sphere><a-light type="point" color="#E6E6FA" intensity="0.65" distance="26" star-twinkle></a-light></a-entity>
+      <a-entity position="25 24 -22" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.75" distance="27" star-twinkle></a-light></a-entity>
+      <a-entity position="30 21 -18" data-star><a-sphere color="#FFFFDD" radius="0.08"></a-sphere><a-light type="point" color="#FFFFDD" intensity="0.6" distance="25" star-twinkle></a-light></a-entity>
+      <a-entity position="-25 26 -15" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="26" star-twinkle></a-light></a-entity>
+      <a-entity position="10 28 -35" data-star><a-sphere color="#E6F0FF" radius="0.07"></a-sphere><a-light type="point" color="#E6F0FF" intensity="0.5" distance="22" star-twinkle></a-light></a-entity>
+      <a-entity position="-30 24 -25" data-star><a-sphere color="#FFFFFF" radius="0.1"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.8" distance="28" star-twinkle></a-light></a-entity>
+      <a-entity position="5 22 -40" data-star><a-sphere color="#FFFFCC" radius="0.08"></a-sphere><a-light type="point" color="#FFFFCC" intensity="0.6" distance="24" star-twinkle></a-light></a-entity>
+      <a-entity position="35 25 -28" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="26" star-twinkle></a-light></a-entity>
+      <a-entity position="-35 21 -30" data-star><a-sphere color="#E6E6FA" radius="0.07"></a-sphere><a-light type="point" color="#E6E6FA" intensity="0.5" distance="23" star-twinkle></a-light></a-entity>
+      <a-entity position="0 26 -45" data-star><a-sphere color="#FFFFDD" radius="0.08"></a-sphere><a-light type="point" color="#FFFFDD" intensity="0.6" distance="25" star-twinkle></a-light></a-entity>
+      <a-entity position="28 27 -12" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="27" star-twinkle></a-light></a-entity>
+      <a-entity position="-28 23 -35" data-star><a-sphere color="#E6F0FF" radius="0.08"></a-sphere><a-light type="point" color="#E6F0FF" intensity="0.6" distance="24" star-twinkle></a-light></a-entity>
+      <a-entity position="12 21 15" data-star><a-sphere color="#FFFFFF" radius="0.1"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.8" distance="29" star-twinkle></a-light></a-entity>
+      <a-entity position="-12 25 20" data-star><a-sphere color="#FFFFCC" radius="0.08"></a-sphere><a-light type="point" color="#FFFFCC" intensity="0.6" distance="25" star-twinkle></a-light></a-entity>
+      <a-entity position="32 24 10" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="27" star-twinkle></a-light></a-entity>
+      <a-entity position="-32 22 5" data-star><a-sphere color="#E6E6FA" radius="0.07"></a-sphere><a-light type="point" color="#E6E6FA" intensity="0.5" distance="22" star-twinkle></a-light></a-entity>
+      <a-entity position="8 26 -5" data-star><a-sphere color="#FFFFDD" radius="0.08"></a-sphere><a-light type="point" color="#FFFFDD" intensity="0.6" distance="24" star-twinkle></a-light></a-entity>
+      <a-entity position="-8 24 25" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="26" star-twinkle></a-light></a-entity>
+      <a-entity position="22 28 8" data-star><a-sphere color="#E6F0FF" radius="0.08"></a-sphere><a-light type="point" color="#E6F0FF" intensity="0.6" distance="25" star-twinkle></a-light></a-entity>
+      <a-entity position="-22 20 -8" data-star><a-sphere color="#FFFFCC" radius="0.08"></a-sphere><a-light type="point" color="#FFFFCC" intensity="0.6" distance="23" star-twinkle></a-light></a-entity>
+      <a-entity position="18 25 30" data-star><a-sphere color="#FFFFFF" radius="0.1"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.8" distance="28" star-twinkle></a-light></a-entity>
+      <a-entity position="-18 23 -18" data-star><a-sphere color="#E6E6FA" radius="0.08"></a-sphere><a-light type="point" color="#E6E6FA" intensity="0.6" distance="24" star-twinkle></a-light></a-entity>
+      <a-entity position="27 22 22" data-star><a-sphere color="#FFFFDD" radius="0.09"></a-sphere><a-light type="point" color="#FFFFDD" intensity="0.7" distance="25" star-twinkle></a-light></a-entity>
+      <a-entity position="-27 26 15" data-star><a-sphere color="#FFFFFF" radius="0.08"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.6" distance="24" star-twinkle></a-light></a-entity>
+      <a-entity position="-5 21 -48" data-star><a-sphere color="#E6F0FF" radius="0.09"></a-sphere><a-light type="point" color="#E6F0FF" intensity="0.7" distance="26" star-twinkle></a-light></a-entity>
+      <a-entity position="38 23 -10" data-star><a-sphere color="#FFFFCC" radius="0.08"></a-sphere><a-light type="point" color="#FFFFCC" intensity="0.6" distance="23" star-twinkle></a-light></a-entity>
+      <a-entity position="-38 25 18" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="26" star-twinkle></a-light></a-entity>
+      <a-entity position="3 24 35" data-star><a-sphere color="#E6E6FA" radius="0.07"></a-sphere><a-light type="point" color="#E6E6FA" intensity="0.5" distance="22" star-twinkle></a-light></a-entity>
+      <a-entity position="-3 22 -32" data-star><a-sphere color="#FFFFDD" radius="0.08"></a-sphere><a-light type="point" color="#FFFFDD" intensity="0.6" distance="24" star-twinkle></a-light></a-entity>
+      <a-entity position="24 27 -40" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="27" star-twinkle></a-light></a-entity>
+      <a-entity position="-24 21 42" data-star><a-sphere color="#E6F0FF" radius="0.08"></a-sphere><a-light type="point" color="#E6F0FF" intensity="0.6" distance="25" star-twinkle></a-light></a-entity>
+      <a-entity position="33 25 35" data-star><a-sphere color="#FFFFFF" radius="0.1"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.8" distance="29" star-twinkle></a-light></a-entity>
+      <a-entity position="-33 23 -22" data-star><a-sphere color="#FFFFCC" radius="0.08"></a-sphere><a-light type="point" color="#FFFFCC" intensity="0.6" distance="24" star-twinkle></a-light></a-entity>
+      <a-entity position="9 26 50" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="26" star-twinkle></a-light></a-entity>
+      <a-entity position="-9 22 -44" data-star><a-sphere color="#E6E6FA" radius="0.08"></a-sphere><a-light type="point" color="#E6E6FA" intensity="0.6" distance="25" star-twinkle></a-light></a-entity>
+      <a-entity position="40 24 -35" data-star><a-sphere color="#FFFFDD" radius="0.09"></a-sphere><a-light type="point" color="#FFFFDD" intensity="0.7" distance="26" star-twinkle></a-light></a-entity>
+      <a-entity position="-40 28 -5" data-star><a-sphere color="#FFFFFF" radius="0.08"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.6" distance="24" star-twinkle></a-light></a-entity>
+      <a-entity position="6 20 38" data-star><a-sphere color="#E6F0FF" radius="0.09"></a-sphere><a-light type="point" color="#E6F0FF" intensity="0.7" distance="27" star-twinkle></a-light></a-entity>
+      <a-entity position="-6 25 -15" data-star><a-sphere color="#FFFFCC" radius="0.08"></a-sphere><a-light type="point" color="#FFFFCC" intensity="0.6" distance="23" star-twinkle></a-light></a-entity>
+      <a-entity position="29 23 48" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="26" star-twinkle></a-light></a-entity>
+      <a-entity position="-29 24 -38" data-star><a-sphere color="#E6E6FA" radius="0.07"></a-sphere><a-light type="point" color="#E6E6FA" intensity="0.5" distance="23" star-twinkle></a-light></a-entity>
+      <a-entity position="16 26 -50" data-star><a-sphere color="#FFFFDD" radius="0.08"></a-sphere><a-light type="point" color="#FFFFDD" intensity="0.6" distance="24" star-twinkle></a-light></a-entity>
+      <a-entity position="-16 21 45" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="26" star-twinkle></a-light></a-entity>
+      <a-entity position="37 22 20" data-star><a-sphere color="#E6F0FF" radius="0.08"></a-sphere><a-light type="point" color="#E6F0FF" intensity="0.6" distance="25" star-twinkle></a-light></a-entity>
+      <a-entity position="-37 25 -28" data-star><a-sphere color="#FFFFFF" radius="0.1"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.8" distance="29" star-twinkle></a-light></a-entity>
+      <a-entity position="11 24 -55" data-star><a-sphere color="#FFFFCC" radius="0.08"></a-sphere><a-light type="point" color="#FFFFCC" intensity="0.6" distance="24" star-twinkle></a-light></a-entity>
+      <a-entity position="-11 23 52" data-star><a-sphere color="#FFFFFF" radius="0.09"></a-sphere><a-light type="point" color="#FFFFFF" intensity="0.7" distance="26" star-twinkle></a-light></a-entity>
+      
+      <!-- Terreno/Suelo del bosque (noche) con textura de pasto -->
+      <a-plane 
+        rotation="-90 0 0" 
+        width="50" 
+        height="50" 
+        color="#1a4d2e"
+        position="0 0 0"
+        grass-texture>
+      </a-plane>
+      
+      <!-- ANIMALES NOCTURNOS (3) -->
+      <!-- Búho 1 en rama -->
+      <a-entity position="5 8 -15" animal-toggle>
+        <a-sphere position="0 0 0" color="#8B4513" radius="0.4"></a-sphere>
+        <a-sphere position="-0.15 0.1 -0.35" color="#FFD700" radius="0.1"></a-sphere>
+        <a-sphere position="0.15 0.1 -0.35" color="#FFD700" radius="0.1"></a-sphere>
+        <a-cone position="-0.25 0.35 -0.15" color="#654321" radius-bottom="0.08" radius-top="0" height="0.15"></a-cone>
+        <a-cone position="0.25 0.35 -0.15" color="#654321" radius-bottom="0.08" radius-top="0" height="0.15"></a-cone>
+        <a-entity sound="src: url(https://cdn.pixabay.com/download/audio/2022/04/28/audio_cd0b7e8cc0.mp3); volume: 0.4; autoplay: true; loop: false"></a-entity>
+      </a-entity>
+      
+      <!-- Búho 2 en otro árbol -->
+      <a-entity position="-10 9 5" animal-toggle>
+        <a-sphere position="0 0 0" color="#7B4E2E" radius="0.35"></a-sphere>
+        <a-sphere position="-0.12 0.08 -0.3" color="#FFFF99" radius="0.09"></a-sphere>
+        <a-sphere position="0.12 0.08 -0.3" color="#FFFF99" radius="0.09"></a-sphere>
+        <a-cone position="-0.2 0.3 -0.12" color="#654321" radius-bottom="0.07" radius-top="0" height="0.13"></a-cone>
+        <a-cone position="0.2 0.3 -0.12" color="#654321" radius-bottom="0.07" radius-top="0" height="0.13"></a-cone>
+      </a-entity>
+      
+      <!-- Ciervo pequeño -->
+      <a-entity position="12 2 -10" animal-toggle>
+        <a-box position="0 0.3 0" color="#8B4513" width="0.6" height="0.6" depth="1"></a-box>
+        <a-sphere position="0 0.8 -0.4" color="#A0522D" radius="0.25"></a-sphere>
+        <a-cone position="-0.15 1.1 -0.35" color="#654321" radius-bottom="0.05" radius-top="0.02" height="0.4"></a-cone>
+        <a-cone position="0.15 1.1 -0.35" color="#654321" radius-bottom="0.05" radius-top="0.02" height="0.4"></a-cone>
+      </a-entity>
+      
+      <!-- OSO GRANDE Y CAFÉ -->
+      <a-entity position="-18 0 18">
+        <!-- Cuerpo principal grande -->
+        <a-sphere position="0 1.5 0" color="#654321" radius="1.2"></a-sphere>
+        <!-- Cabeza -->
+        <a-sphere position="0 2.8 -0.8" color="#5C3D2E" radius="0.9"></a-sphere>
+        <!-- Hocico/Snout -->
+        <a-sphere position="0 2.4 -1.5" color="#6B4423" radius="0.5"></a-sphere>
+        <!-- Oreja izquierda -->
+        <a-sphere position="-0.7 3.5 -0.5" color="#4A2C1A" radius="0.35"></a-sphere>
+        <!-- Oreja derecha -->
+        <a-sphere position="0.7 3.5 -0.5" color="#4A2C1A" radius="0.35"></a-sphere>
+        <!-- Ojo izquierdo -->
+        <a-sphere position="-0.35 2.9 -1.1" color="#000000" radius="0.15"></a-sphere>
+        <!-- Ojo derecho -->
+        <a-sphere position="0.35 2.9 -1.1" color="#000000" radius="0.15"></a-sphere>
+        <!-- Nariz -->
+        <a-sphere position="0 2.5 -1.6" color="#2C1810" radius="0.12"></a-sphere>
+        <!-- Pata frontal izquierda -->
+        <a-cylinder position="-0.7 0.5 -0.3" color="#5C3D2E" radius="0.35" height="1"></a-cylinder>
+        <!-- Pata frontal derecha -->
+        <a-cylinder position="0.7 0.5 -0.3" color="#5C3D2E" radius="0.35" height="1"></a-cylinder>
+        <!-- Pata trasera izquierda -->
+        <a-cylinder position="-0.7 0.5 0.8" color="#5C3D2E" radius="0.35" height="1"></a-cylinder>
+        <!-- Pata trasera derecha -->
+        <a-cylinder position="0.7 0.5 0.8" color="#5C3D2E" radius="0.35" height="1"></a-cylinder>
+      </a-entity>
+
+      <!-- BÚHO 3 en árbol alto -->
+      <a-entity position="-25 10 -20" animal-toggle>
+        <a-sphere position="0 0 0" color="#6B5344" radius="0.38"></a-sphere>
+        <a-sphere position="-0.13 0.09 -0.32" color="#FFEB3B" radius="0.095"></a-sphere>
+        <a-sphere position="0.13 0.09 -0.32" color="#FFEB3B" radius="0.095"></a-sphere>
+        <a-cone position="-0.22 0.32 -0.14" color="#654321" radius-bottom="0.075" radius-top="0" height="0.14"></a-cone>
+        <a-cone position="0.22 0.32 -0.14" color="#654321" radius-bottom="0.075" radius-top="0" height="0.14"></a-cone>
+      </a-entity>
+
+      <!-- LOBO GRIS -->
+      <a-entity position="20 1 -25" animal-toggle>
+        <!-- Cuerpo -->
+        <a-box position="0 0.4 0" color="#4A4A4A" width="0.8" height="0.5" depth="1.2"></a-box>
+        <!-- Cabeza -->
+        <a-sphere position="0 0.7 -0.6" color="#505050" radius="0.35"></a-sphere>
+        <!-- Hocico -->
+        <a-cone position="0 0.5 -0.9" color="#696969" radius-bottom="0.2" radius-top="0.08" height="0.3"></a-cone>
+        <!-- Oreja izquierda -->
+        <a-cone position="-0.2 1 -0.35" color="#505050" radius-bottom="0.1" radius-top="0.02" height="0.25"></a-cone>
+        <!-- Oreja derecha -->
+        <a-cone position="0.2 1 -0.35" color="#505050" radius-bottom="0.1" radius-top="0.02" height="0.25"></a-cone>
+        <!-- Ojo izquierdo -->
+        <a-sphere position="-0.15 0.75 -0.8" color="#FFD700" radius="0.08"></a-sphere>
+        <!-- Ojo derecho -->
+        <a-sphere position="0.15 0.75 -0.8" color="#FFD700" radius="0.08"></a-sphere>
+        <!-- Cola -->
+        <a-cone position="0 0.3 0.8" color="#505050" radius-bottom="0.15" radius-top="0.05" height="0.6"></a-cone>
+      </a-entity>
+
+      <!-- ZORRO NARANJA -->
+      <a-entity position="-22 1 15" animal-toggle>
+        <!-- Cuerpo -->
+        <a-box position="0 0.35 0" color="#FF6B35" width="0.6" height="0.45" depth="0.9"></a-box>
+        <!-- Cabeza -->
+        <a-sphere position="0 0.65 -0.45" color="#FF7A47" radius="0.3"></a-sphere>
+        <!-- Hocico -->
+        <a-cone position="0 0.5 -0.7" color="#FF8C5A" radius-bottom="0.15" radius-top="0.05" height="0.25"></a-cone>
+        <!-- Oreja izquierda -->
+        <a-cone position="-0.15 0.9 -0.3" color="#FF6B35" radius-bottom="0.08" radius-top="0.02" height="0.22"></a-cone>
+        <!-- Oreja derecha -->
+        <a-cone position="0.15 0.9 -0.3" color="#FF6B35" radius-bottom="0.08" radius-top="0.02" height="0.22"></a-cone>
+        <!-- Ojo izquierdo -->
+        <a-sphere position="-0.12 0.68 -0.6" color="#000000" radius="0.07"></a-sphere>
+        <!-- Ojo derecho -->
+        <a-sphere position="0.12 0.68 -0.6" color="#000000" radius="0.07"></a-sphere>
+        <!-- Cola esponjuda -->
+        <a-cone position="0 0.25 0.6" color="#FF6B35" radius-bottom="0.2" radius-top="0.08" height="0.7"></a-cone>
+      </a-entity>
+
+      <!-- MAPACHE BANDIDO -->
+      <a-entity position="15 1 20" animal-toggle>
+        <!-- Cuerpo redondeado -->
+        <a-sphere position="0 0.4 0" color="#6B6B6B" radius="0.5"></a-sphere>
+        <!-- Cabeza -->
+        <a-sphere position="0 0.7 -0.35" color="#808080" radius="0.32"></a-sphere>
+        <!-- Máscara negra -->
+        <a-box position="0 0.75 -0.55" color="#1a1a1a" width="0.35" height="0.22" depth="0.15"></a-box>
+        <!-- Hocico -->
+        <a-sphere position="0 0.55 -0.6" color="#A9A9A9" radius="0.15"></a-sphere>
+        <!-- Oreja izquierda -->
+        <a-cone position="-0.18 0.95 -0.15" color="#808080" radius-bottom="0.1" radius-top="0.02" height="0.2"></a-cone>
+        <!-- Oreja derecha -->
+        <a-cone position="0.18 0.95 -0.15" color="#808080" radius-bottom="0.1" radius-top="0.02" height="0.2"></a-cone>
+        <!-- Ojo izquierdo -->
+        <a-sphere position="-0.1 0.8 -0.5" color="#FFD700" radius="0.07"></a-sphere>
+        <!-- Ojo derecho -->
+        <a-sphere position="0.1 0.8 -0.5" color="#FFD700" radius="0.07"></a-sphere>
+        <!-- Cola anillada (bandas) -->
+        <a-cylinder position="0 0.2 0.5" color="#6B6B6B" radius="0.12" height="0.5"></a-cylinder>
+      </a-entity>
+
+      <!-- CIERVO 2 (más grande) -->
+      <a-entity position="-30 2 -5" animal-toggle>
+        <a-box position="0 0.4 0" color="#7A5C47" width="0.8" height="0.7" depth="1.3"></a-box>
+        <a-sphere position="0 1 -0.5" color="#8B6F47" radius="0.35"></a-sphere>
+        <!-- Cuerna izquierda -->
+        <a-cone position="-0.2 1.35 -0.45" color="#8B7355" radius-bottom="0.06" radius-top="0.01" height="0.5"></a-cone>
+        <!-- Cuerna derecha -->
+        <a-cone position="0.2 1.35 -0.45" color="#8B7355" radius-bottom="0.06" radius-top="0.01" height="0.5"></a-cone>
+      </a-entity>
+
+      <!-- BÚHO 4 pequeño -->
+      <a-entity position="28 7 -30" animal-toggle>
+        <a-sphere position="0 0 0" color="#654321" radius="0.3"></a-sphere>
+        <a-sphere position="-0.1 0.07 -0.25" color="#FFFACD" radius="0.08"></a-sphere>
+        <a-sphere position="0.1 0.07 -0.25" color="#FFFACD" radius="0.08"></a-sphere>
+        <a-cone position="-0.16 0.25 -0.12" color="#654321" radius-bottom="0.06" radius-top="0" height="0.11"></a-cone>
+        <a-cone position="0.16 0.25 -0.12" color="#654321" radius-bottom="0.06" radius-top="0" height="0.11"></a-cone>
+      </a-entity>
+
+      <!-- BOTÓN DÍA/NOCHE -->
+      <a-entity position="8 2 -8" day-night-toggle>
+        <a-cylinder position="0 0 0" color="#FFD700" radius="0.5" height="0.1"></a-cylinder>
+        <a-text value="DÍA/NOCHE" position="0 0.3 0" align="center" color="#000000" scale="0.5 0.5 0.5"></a-text>
+      </a-entity>
+
+      <!-- CABAÑA DE MADERA -->
+      <a-entity position="-12 0 10">
+        <!-- Paredes principales (estructura base) -->
+        <a-box position="0 1 0" color="#8B5A3C" width="3" height="2.2" depth="3.5"></a-box>
+        
+        <!-- Techo triangular (pirámide) -->
+        <a-cone position="0 2.4 0" color="#654321" radius-bottom="1.8" radius-top="0" height="1.5"></a-cone>
+        
+        <!-- Puerta de madera -->
+        <a-box position="0 0.8 1.8" color="#5C3D2E" width="0.8" height="1.6" depth="0.1"></a-box>
+        
+        <!-- Manija de la puerta -->
+        <a-sphere position="0.35 0.8 1.85" color="#FFD700" radius="0.1"></a-sphere>
+        
+        <!-- Ventana izquierda -->
+        <a-box position="-1 1.3 1.8" color="#87CEEB" width="0.6" height="0.6" depth="0.05"></a-box>
+        
+        <!-- Ventana derecha -->
+        <a-box position="1 1.3 1.8" color="#87CEEB" width="0.6" height="0.6" depth="0.05"></a-box>
+        
+        <!-- Chimenea (tubo cilíndrico) -->
+        <a-cylinder position="1.2 2.5 -1" color="#8B4513" radius="0.25" height="0.8"></a-cylinder>
+        
+        <!-- Humo saliendo de la chimenea -->
+        <a-entity position="1.2 3.4 -1">
+          <a-sphere color="#D3D3D3" radius="0.3" opacity="0.6"></a-sphere>
+          <a-animation attribute="position" from="1.2 3.4 -1" to="1.2 4.2 -1" dur="3000" repeat="indefinite"></a-animation>
+        </a-entity>
+        
+        <!-- Plataforma/pórtico delantero -->
+        <a-box position="0 0.25 2.3" color="#8B5A3C" width="3.5" height="0.3" depth="0.6"></a-box>
+        
+        <!-- Escalones (3 peldaños) -->
+        <a-box position="0 0.15 2.8" color="#8B5A3C" width="3.2" height="0.2" depth="0.4"></a-box>
+        <a-box position="0 0.05 3.2" color="#8B5A3C" width="2.8" height="0.2" depth="0.4"></a-box>
+      </a-entity>
+      
+      <!-- TIENDA DE CAMPAÑA MEJORADA (4) - ELIMINADA -->
+      
+      
+      <!-- BANCO/ASIENTO (5) -->
+      <a-entity position="4 0 13" rotation="0 -90 0">
+        <!-- Asiento -->
+        <a-box position="0 0.5 0" color="#8B4513" width="1.5" height="0.2" depth="0.5"></a-box>
+        
+        <!-- Respaldo -->
+        <a-box position="0 1.1 -0.3" color="#A0522D" width="1.5" height="0.8" depth="0.1"></a-box>
+        
+        <!-- Patas delanteras -->
+        <a-cylinder position="-0.65 0.2 0.2" color="#654321" radius="0.08" height="0.4"></a-cylinder>
+        <a-cylinder position="0.65 0.2 0.2" color="#654321" radius="0.08" height="0.4"></a-cylinder>
+        
+        <!-- Patas traseras -->
+        <a-cylinder position="-0.65 0.2 -0.2" color="#654321" radius="0.08" height="0.4"></a-cylinder>
+        <a-cylinder position="0.65 0.2 -0.2" color="#654321" radius="0.08" height="0.4"></a-cylinder>
+      </a-entity>
+      
+      <!-- ÁRBOL 1 - Tronco y copa -->
+      <a-cylinder 
+        position="-8 2 -5" 
+        color="#654321"
+        radius="0.6"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="-8 5 -5" 
+        color="#228B22"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="-8 6.5 -5" 
+        color="#2D5016"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 2 -->
+      <a-cylinder 
+        position="6 2 -8" 
+        color="#654321"
+        radius="0.6"
+        height="4.5">
+      </a-cylinder>
+      <a-cone 
+        position="6 5.5 -8" 
+        color="#1B7A3A"
+        radius-bottom="2.2"
+        radius-top="0.5"
+        height="3.5">
+      </a-cone>
+      <a-cone 
+        position="6 7.2 -8" 
+        color="#228B22"
+        radius-bottom="2"
+        radius-top="0"
+        height="2.2">
+      </a-cone>
+      
+      <!-- ÁRBOL 3 -->
+      <a-cylinder 
+        position="-12 2 5" 
+        color="#654321"
+        radius="0.5"
+        height="3.5">
+      </a-cylinder>
+      <a-cone 
+        position="-12 4.8 5" 
+        color="#228B22"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="-12 6.3 5" 
+        color="#2D5016"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 4 -->
+      <a-cylinder 
+        position="10 2 8" 
+        color="#654321"
+        radius="0.4"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="10 5 8" 
+        color="#1B7A3A"
+        radius-bottom="1.8"
+        radius-top="0.4"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="10 6.5 8" 
+        color="#228B22"
+        radius-bottom="1.6"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- ÁRBOL 5 -->
+      <a-cylinder 
+        position="-5 2 12" 
+        color="#654321"
+        radius="0.5"
+        height="3.8">
+      </a-cylinder>
+      <a-cone 
+        position="-5 4.9 12" 
+        color="#228B22"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="-5 6.4 12" 
+        color="#2D5016"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 6 -->
+      <a-cylinder 
+        position="15 2 -10" 
+        color="#654321"
+        radius="0.5"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="15 5 -10" 
+        color="#228B22"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="15 6.5 -10" 
+        color="#1B7A3A"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 7 -->
+      <a-cylinder 
+        position="-15 2 -8" 
+        color="#654321"
+        radius="0.6"
+        height="4.2">
+      </a-cylinder>
+      <a-cone 
+        position="-15 5.1 -8" 
+        color="#1B7A3A"
+        radius-bottom="2.2"
+        radius-top="0.5"
+        height="3.2">
+      </a-cone>
+      <a-cone 
+        position="-15 6.8 -8" 
+        color="#228B22"
+        radius-bottom="2"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 8 -->
+      <a-cylinder 
+        position="12 2 3" 
+        color="#654321"
+        radius="0.5"
+        height="3.5">
+      </a-cylinder>
+      <a-cone 
+        position="12 4.8 3" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.8">
+      </a-cone>
+      <a-cone 
+        position="12 6.2 3" 
+        color="#2D5016"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- ÁRBOL 9 -->
+      <a-cylinder 
+        position="-16 2 10" 
+        color="#654321"
+        radius="0.5"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="-16 5 10" 
+        color="#1B7A3A"
+        radius-bottom="2.1"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="-16 6.6 10" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 10 -->
+      <a-cylinder 
+        position="14 2 12" 
+        color="#654321"
+        radius="0.4"
+        height="3.8">
+      </a-cylinder>
+      <a-cone 
+        position="14 4.9 12" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.4"
+        height="2.8">
+      </a-cone>
+      <a-cone 
+        position="14 6.3 12" 
+        color="#1B7A3A"
+        radius-bottom="1.6"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- ÁRBOL 11 -->
+      <a-cylinder 
+        position="-10 2 -15" 
+        color="#654321"
+        radius="0.5"
+        height="4.2">
+      </a-cylinder>
+      <a-cone 
+        position="-10 5.1 -15" 
+        color="#1B7A3A"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3.2">
+      </a-cone>
+      <a-cone 
+        position="-10 6.8 -15" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 12 -->
+      <a-cylinder 
+        position="8 2 -12" 
+        color="#654321"
+        radius="0.5"
+        height="3.6">
+      </a-cylinder>
+      <a-cone 
+        position="8 4.8 -12" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0.5"
+        height="2.9">
+      </a-cone>
+      <a-cone 
+        position="8 6.3 -12" 
+        color="#2D5016"
+        radius-bottom="1.6"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- ÁRBOL 13 -->
+      <a-cylinder 
+        position="-14 2 2" 
+        color="#654321"
+        radius="0.6"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="-14 5 2" 
+        color="#1B7A3A"
+        radius-bottom="2.1"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="-14 6.6 2" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 14 -->
+      <a-cylinder 
+        position="10 2 -18" 
+        color="#654321"
+        radius="0.5"
+        height="3.9">
+      </a-cylinder>
+      <a-cone 
+        position="10 4.95 -18" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.9">
+      </a-cone>
+      <a-cone 
+        position="10 6.4 -18" 
+        color="#1B7A3A"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.9">
+      </a-cone>
+      
+      <!-- ÁRBOL 15 -->
+      <a-cylinder 
+        position="-8 2 -18" 
+        color="#654321"
+        radius="0.5"
+        height="4.1">
+      </a-cylinder>
+      <a-cone 
+        position="-8 5.05 -18" 
+        color="#1B7A3A"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3.1">
+      </a-cone>
+      <a-cone 
+        position="-8 6.7 -18" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 16 -->
+      <a-cylinder 
+        position="18 2 5" 
+        color="#654321"
+        radius="0.4"
+        height="3.7">
+      </a-cylinder>
+      <a-cone 
+        position="18 4.85 5" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0.4"
+        height="2.7">
+      </a-cone>
+      <a-cone 
+        position="18 6.2 5" 
+        color="#2D5016"
+        radius-bottom="1.5"
+        radius-top="0"
+        height="1.7">
+      </a-cone>
+      
+      <!-- ÁRBOL 17 -->
+      <a-cylinder 
+        position="-18 2 7" 
+        color="#654321"
+        radius="0.5"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="-18 5 7" 
+        color="#1B7A3A"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="-18 6.6 7" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 18 -->
+      <a-cylinder 
+        position="16 2 -5" 
+        color="#654321"
+        radius="0.5"
+        height="3.8">
+      </a-cylinder>
+      <a-cone 
+        position="16 4.9 -5" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.9">
+      </a-cone>
+      <a-cone 
+        position="16 6.3 -5" 
+        color="#1B7A3A"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- ÁRBOL 19 -->
+      <a-cylinder 
+        position="-12 2 -12" 
+        color="#654321"
+        radius="0.6"
+        height="4.2">
+      </a-cylinder>
+      <a-cone 
+        position="-12 5.1 -12" 
+        color="#1B7A3A"
+        radius-bottom="2.1"
+        radius-top="0.5"
+        height="3.2">
+      </a-cone>
+      <a-cone 
+        position="-12 6.8 -12" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 20 -->
+      <a-cylinder 
+        position="6 2 14" 
+        color="#654321"
+        radius="0.5"
+        height="3.9">
+      </a-cylinder>
+      <a-cone 
+        position="6 4.95 14" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.9">
+      </a-cone>
+      <a-cone 
+        position="6 6.4 14" 
+        color="#2D5016"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.9">
+      </a-cone>
+      
+      <!-- ÁRBOL 21 -->
+      <a-cylinder 
+        position="20 2 0" 
+        color="#654321"
+        radius="0.5"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="20 5 0" 
+        color="#228B22"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="20 6.6 0" 
+        color="#1B7A3A"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 22 -->
+      <a-cylinder 
+        position="-20 2 0" 
+        color="#654321"
+        radius="0.5"
+        height="4.1">
+      </a-cylinder>
+      <a-cone 
+        position="-20 5.05 0" 
+        color="#1B7A3A"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3.1">
+      </a-cone>
+      <a-cone 
+        position="-20 6.7 0" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 23 -->
+      <a-cylinder 
+        position="0 2 -20" 
+        color="#654321"
+        radius="0.5"
+        height="3.8">
+      </a-cylinder>
+      <a-cone 
+        position="0 4.9 -20" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.9">
+      </a-cone>
+      <a-cone 
+        position="0 6.3 -20" 
+        color="#2D5016"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- ÁRBOL 24 -->
+      <a-cylinder 
+        position="17 2 -7" 
+        color="#654321"
+        radius="0.5"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="17 5 -7" 
+        color="#1B7A3A"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="17 6.6 -7" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 25 -->
+      <a-cylinder 
+        position="-17 2 -7" 
+        color="#654321"
+        radius="0.5"
+        height="3.9">
+      </a-cylinder>
+      <a-cone 
+        position="-17 4.95 -7" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.9">
+      </a-cone>
+      <a-cone 
+        position="-17 6.4 -7" 
+        color="#1B7A3A"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.9">
+      </a-cone>
+      
+      <!-- ÁRBOL 26 -->
+      <a-cylinder 
+        position="16 2 10" 
+        color="#654321"
+        radius="0.5"
+        height="4.2">
+      </a-cylinder>
+      <a-cone 
+        position="16 5.1 10" 
+        color="#1B7A3A"
+        radius-bottom="2.1"
+        radius-top="0.5"
+        height="3.2">
+      </a-cone>
+      <a-cone 
+        position="16 6.8 10" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 27 -->
+      <a-cylinder 
+        position="-16 2 10" 
+        color="#654321"
+        radius="0.5"
+        height="3.8">
+      </a-cylinder>
+      <a-cone 
+        position="-16 4.9 10" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.8">
+      </a-cone>
+      <a-cone 
+        position="-16 6.3 10" 
+        color="#2D5016"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- ÁRBOL 28 -->
+      <a-cylinder 
+        position="12 2 -14" 
+        color="#654321"
+        radius="0.5"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="12 5 -14" 
+        color="#1B7A3A"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="12 6.6 -14" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 29 -->
+      <a-cylinder 
+        position="-12 2 14" 
+        color="#654321"
+        radius="0.5"
+        height="3.9">
+      </a-cylinder>
+      <a-cone 
+        position="-12 4.95 14" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.9">
+      </a-cone>
+      <a-cone 
+        position="-12 6.4 14" 
+        color="#1B7A3A"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.9">
+      </a-cone>
+      
+      <!-- ÁRBOL 30 -->
+      <a-cylinder 
+        position="3 2 -16" 
+        color="#654321"
+        radius="0.5"
+        height="4.1">
+      </a-cylinder>
+      <a-cone 
+        position="3 5.05 -16" 
+        color="#1B7A3A"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3.1">
+      </a-cone>
+      <a-cone 
+        position="3 6.7 -16" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 31 -->
+      <a-cylinder 
+        position="-3 2 -16" 
+        color="#654321"
+        radius="0.5"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="-3 5 -16" 
+        color="#228B22"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="-3 6.6 -16" 
+        color="#1B7A3A"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 32 -->
+      <a-cylinder 
+        position="19 2 8" 
+        color="#654321"
+        radius="0.5"
+        height="3.8">
+      </a-cylinder>
+      <a-cone 
+        position="19 4.9 8" 
+        color="#1B7A3A"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.8">
+      </a-cone>
+      <a-cone 
+        position="19 6.3 8" 
+        color="#228B22"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- ÁRBOL 33 -->
+      <a-cylinder 
+        position="-19 2 -10" 
+        color="#654321"
+        radius="0.5"
+        height="4.2">
+      </a-cylinder>
+      <a-cone 
+        position="-19 5.1 -10" 
+        color="#228B22"
+        radius-bottom="2.1"
+        radius-top="0.5"
+        height="3.2">
+      </a-cone>
+      <a-cone 
+        position="-19 6.8 -10" 
+        color="#2D5016"
+        radius-bottom="1.9"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 34 -->
+      <a-cylinder 
+        position="18 2 15" 
+        color="#654321"
+        radius="0.5"
+        height="3.9">
+      </a-cylinder>
+      <a-cone 
+        position="18 4.95 15" 
+        color="#1B7A3A"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.9">
+      </a-cone>
+      <a-cone 
+        position="18 6.4 15" 
+        color="#228B22"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.9">
+      </a-cone>
+      
+      <!-- ÁRBOL 35 -->
+      <a-cylinder 
+        position="-18 2 16" 
+        color="#654321"
+        radius="0.5"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="-18 5 16" 
+        color="#228B22"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="-18 6.6 16" 
+        color="#1B7A3A"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 36 -->
+      <a-cylinder 
+        position="8 2 -15" 
+        color="#654321"
+        radius="0.5"
+        height="4.1">
+      </a-cylinder>
+      <a-cone 
+        position="8 5.05 -15" 
+        color="#1B7A3A"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3.1">
+      </a-cone>
+      <a-cone 
+        position="8 6.7 -15" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 37 -->
+      <a-cylinder 
+        position="-8 2 17" 
+        color="#654321"
+        radius="0.5"
+        height="3.8">
+      </a-cylinder>
+      <a-cone 
+        position="-8 4.9 17" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.8">
+      </a-cone>
+      <a-cone 
+        position="-8 6.3 17" 
+        color="#2D5016"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- ÁRBOL 38 -->
+      <a-cylinder 
+        position="15 2 -18" 
+        color="#654321"
+        radius="0.5"
+        height="4">
+      </a-cylinder>
+      <a-cone 
+        position="15 5 -18" 
+        color="#1B7A3A"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3">
+      </a-cone>
+      <a-cone 
+        position="15 6.6 -18" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- ÁRBOL 39 -->
+      <a-cylinder 
+        position="-15 2 18" 
+        color="#654321"
+        radius="0.5"
+        height="3.9">
+      </a-cylinder>
+      <a-cone 
+        position="-15 4.95 18" 
+        color="#228B22"
+        radius-bottom="1.9"
+        radius-top="0.5"
+        height="2.9">
+      </a-cone>
+      <a-cone 
+        position="-15 6.4 18" 
+        color="#1B7A3A"
+        radius-bottom="1.7"
+        radius-top="0"
+        height="1.9">
+      </a-cone>
+      
+      <!-- ÁRBOL 40 -->
+      <a-cylinder 
+        position="0 2 19" 
+        color="#654321"
+        radius="0.5"
+        height="4.1">
+      </a-cylinder>
+      <a-cone 
+        position="0 5.05 19" 
+        color="#1B7A3A"
+        radius-bottom="2"
+        radius-top="0.5"
+        height="3.1">
+      </a-cone>
+      <a-cone 
+        position="0 6.7 19" 
+        color="#228B22"
+        radius-bottom="1.8"
+        radius-top="0"
+        height="2">
+      </a-cone>
+      
+      <!-- FOGATA MEJORADA -->
+      <!-- Troncos de madera -->
+      <a-cylinder 
+        position="-1.5 0.3 10" 
+        rotation="0 0 45"
+        color="#5C4033"
+        radius="0.15"
+        height="1.2">
+      </a-cylinder>
+      <a-cylinder 
+        position="1.5 0.3 10" 
+        rotation="0 0 -45"
+        color="#5C4033"
+        radius="0.15"
+        height="1.2">
+      </a-cylinder>
+      
+      <!-- Piedras alrededor de la fogata -->
+      <a-sphere position="-0.8 0.1 9.5" color="#444444" radius="0.25"></a-sphere>
+      <a-sphere position="0.8 0.1 9.5" color="#555555" radius="0.25"></a-sphere>
+      <a-sphere position="0 0.1 10.5" color="#444444" radius="0.25"></a-sphere>
+      
+      <!-- Llamas (grupo clickeable con animación) -->
+      <a-entity id="fire-group" position="0 0.8 10" fire-toggle>
+        
+        <!-- Llama roja-naranja exterior izquierda -->
+        <a-cone 
+          position="-0.6 0.2 0" 
+          color="#FF4500"
+          radius-bottom="0.45"
+          radius-top="0.05"
+          height="1.4"
+          emissive="#FF4500"
+          emissive-intensity="0.5"
+          flame-animation
+          data-flame>
+        </a-cone>
+        
+        <!-- Llama naranja central (más grande) -->
+        <a-cone 
+          position="0 0.5 0" 
+          color="#FFA500"
+          radius-bottom="0.6"
+          radius-top="0.1"
+          height="1.8"
+          emissive="#FFD700"
+          emissive-intensity="0.7"
+          flame-animation
+          data-flame>
+        </a-cone>
+        
+        <!-- Llama roja-naranja exterior derecha -->
+        <a-cone 
+          position="0.6 0.2 0" 
+          color="#FF6347"
+          radius-bottom="0.45"
+          radius-top="0.05"
+          height="1.4"
+          emissive="#FF6347"
+          emissive-intensity="0.5"
+          flame-animation
+          data-flame>
+        </a-cone>
+        
+        <!-- Llama amarilla interior (brillo) -->
+        <a-cone 
+          position="0 0 0" 
+          color="#FFD700"
+          radius-bottom="0.35"
+          radius-top="0"
+          height="1"
+          emissive="#FFFF00"
+          emissive-intensity="0.9"
+          flame-animation
+          data-flame>
+        </a-cone>
+        
+        <!-- Partículas/llamas pequeñas flotantes -->
+        <a-cone 
+          position="-0.3 0.7 -0.2" 
+          color="#FFA500"
+          radius-bottom="0.2"
+          radius-top="0"
+          height="0.6"
+          emissive="#FF8C00"
+          emissive-intensity="0.6"
+          flame-animation
+          data-flame>
+        </a-cone>
+        
+        <a-cone 
+          position="0.3 0.8 0.2" 
+          color="#FF4500"
+          radius-bottom="0.2"
+          radius-top="0"
+          height="0.6"
+          emissive="#FF4500"
+          emissive-intensity="0.6"
+          flame-animation
+          data-flame>
+        </a-cone>
+        
+      </a-entity>
+      
+      <!-- Luz de la fogata (mejorada) -->
+      <a-light 
+        id="fire-light"
+        type="point" 
+        color="#FFA500" 
+        intensity="2" 
+        distance="30"
+        position="0 1 10">
+      </a-light>
+      
+      <!-- Luz secundaria (roja) para más efecto -->
+      <a-light 
+        id="fire-light-red"
+        type="point" 
+        color="#FF4500" 
+        intensity="1" 
+        distance="25"
+        position="0 0.8 10">
+      </a-light>
+
+      <!-- Luz del SOL (para el día) -->
+      <a-light 
+        id="sun-light"
+        type="directional" 
+        color="#FFFF99" 
+        intensity="0"
+        position="10 20 10">
+      </a-light>
+
+      <!-- Luz de la LUNA (para la noche) -->
+      <a-light 
+        id="moon-light"
+        type="directional" 
+        color="#CCCCFF" 
+        intensity="0.3"
+        position="-5 15 10">
+      </a-light>
+
+      <!-- Luz ambiental -->
+      <a-light 
+        id="ambient-light"
+        type="ambient" 
+        color="#FFFFFF" 
+        intensity="0.2">
+      </a-light>
+      
+      <!-- ÁRBOLES CERCA DE LA FOGATA -->
+      <!-- ÁRBOL 41 - Izquierda y atrás de fogata -->
+      <a-cylinder 
+        position="-6 2 6" 
+        color="#654321"
+        radius="0.4"
+        height="3.5">
+      </a-cylinder>
+      <a-cone 
+        position="-6 4.8 6" 
+        color="#228B22"
+        radius-bottom="1.7"
+        radius-top="0.4"
+        height="2.7">
+      </a-cone>
+      <a-cone 
+        position="-6 6.2 6" 
+        color="#1B7A3A"
+        radius-bottom="1.5"
+        radius-top="0"
+        height="1.7">
+      </a-cone>
+      
+      <!-- ÁRBOL 42 - Derecha y atrás de fogata -->
+      <a-cylinder 
+        position="6 2 6" 
+        color="#654321"
+        radius="0.4"
+        height="3.5">
+      </a-cylinder>
+      <a-cone 
+        position="6 4.8 6" 
+        color="#1B7A3A"
+        radius-bottom="1.7"
+        radius-top="0.4"
+        height="2.7">
+      </a-cone>
+      <a-cone 
+        position="6 6.2 6" 
+        color="#228B22"
+        radius-bottom="1.5"
+        radius-top="0"
+        height="1.7">
+      </a-cone>
+      
+      <!-- ÁRBOL 43 - Frente izquierdo de fogata -->
+      <a-cylinder 
+        position="-5 2 14" 
+        color="#654321"
+        radius="0.4"
+        height="3.5">
+      </a-cylinder>
+      <a-cone 
+        position="-5 4.8 14" 
+        color="#228B22"
+        radius-bottom="1.7"
+        radius-top="0.4"
+        height="2.7">
+      </a-cone>
+      <a-cone 
+        position="-5 6.2 14" 
+        color="#2D5016"
+        radius-bottom="1.5"
+        radius-top="0"
+        height="1.7">
+      </a-cone>
+      
+      <!-- ÁRBOL 44 - Frente derecho de fogata -->
+      <a-cylinder 
+        position="5 2 14" 
+        color="#654321"
+        radius="0.4"
+        height="3.5">
+      </a-cylinder>
+      <a-cone 
+        position="5 4.8 14" 
+        color="#1B7A3A"
+        radius-bottom="1.7"
+        radius-top="0.4"
+        height="2.7">
+      </a-cone>
+      <a-cone 
+        position="5 6.2 14" 
+        color="#228B22"
+        radius-bottom="1.5"
+        radius-top="0"
+        height="1.7">
+      </a-cone>
+      
+      <!-- ÁRBOL 45 - Izquierda de fogata -->
+      <a-cylinder 
+        position="-7 2 10" 
+        color="#654321"
+        radius="0.4"
+        height="3.6">
+      </a-cylinder>
+      <a-cone 
+        position="-7 4.8 10" 
+        color="#228B22"
+        radius-bottom="1.7"
+        radius-top="0.4"
+        height="2.8">
+      </a-cone>
+      <a-cone 
+        position="-7 6.3 10" 
+        color="#1B7A3A"
+        radius-bottom="1.5"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- ÁRBOL 46 - Derecha de fogata -->
+      <a-cylinder 
+        position="7 2 10" 
+        color="#654321"
+        radius="0.4"
+        height="3.6">
+      </a-cylinder>
+      <a-cone 
+        position="7 4.8 10" 
+        color="#1B7A3A"
+        radius-bottom="1.7"
+        radius-top="0.4"
+        height="2.8">
+      </a-cone>
+      <a-cone 
+        position="7 6.3 10" 
+        color="#228B22"
+        radius-bottom="1.5"
+        radius-top="0"
+        height="1.8">
+      </a-cone>
+      
+      <!-- Rocas/piedras decorativas pequeñas -->
+      <a-sphere 
+        position="3 0.1 2" 
+        color="#808080"
+        radius="0.15"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="-4 0.1 -3" 
+        color="#A9A9A9"
+        radius="0.12"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="8 0.1 3" 
+        color="#808080"
+        radius="0.1"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="5 0.1 -5" 
+        color="#A9A9A9"
+        radius="0.13"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="-6 0.1 4" 
+        color="#808080"
+        radius="0.11"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="2 0.1 -8" 
+        color="#A9A9A9"
+        radius="0.14"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="-5 0.1 -7" 
+        color="#808080"
+        radius="0.12"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="7 0.1 6" 
+        color="#A9A9A9"
+        radius="0.13"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="-3 0.1 8" 
+        color="#808080"
+        radius="0.1"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="9 0.1 -2" 
+        color="#A9A9A9"
+        radius="0.12"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="1 0.1 5" 
+        color="#808080"
+        radius="0.11"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="-7 0.1 1" 
+        color="#A9A9A9"
+        radius="0.13"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="6 0.1 9" 
+        color="#808080"
+        radius="0.12"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="-2 0.1 -10" 
+        color="#A9A9A9"
+        radius="0.14"
+        pickup-stone>
+      </a-sphere>
+      
+      <a-sphere 
+        position="4 0.1 -12" 
+        color="#808080"
+        radius="0.11"
+        pickup-stone>
+      </a-sphere>
+      
+      <!-- RAMITAS/LEÑA -->
+      <a-cylinder position="3.5 0.2 0" rotation="20 45 0" color="#8B4513" radius="0.05" height="0.6" pickup-sticks></a-cylinder>
+      <a-cylinder position="-3.5 0.2 2" rotation="15 -30 0" color="#7B3F12" radius="0.04" height="0.55" pickup-sticks></a-cylinder>
+      <a-cylinder position="6 0.2 -2" rotation="25 60 0" color="#8B4513" radius="0.05" height="0.6" pickup-sticks></a-cylinder>
+      <a-cylinder position="-5 0.2 6" rotation="18 -45 0" color="#6B3410" radius="0.04" height="0.52" pickup-sticks></a-cylinder>
+      <a-cylinder position="8 0.2 5" rotation="22 90 0" color="#8B4513" radius="0.045" height="0.58" pickup-sticks></a-cylinder>
+      <a-cylinder position="-6 0.2 -4" rotation="20 -60 0" color="#7B3F12" radius="0.04" height="0.54" pickup-sticks></a-cylinder>
+      <a-cylinder position="2 0.2 -6" rotation="16 30 0" color="#8B4513" radius="0.05" height="0.56" pickup-sticks></a-cylinder>
+      <a-cylinder position="-4 0.2 8" rotation="24 -90 0" color="#6B3410" radius="0.045" height="0.6" pickup-sticks></a-cylinder>
+      
+      <!-- PLANTAS/HIERBAS -->
+      <a-box position="4 0.15 1" color="#228B22" width="0.2" height="0.3" depth="0.2" pickup-plants></a-box>
+      <a-box position="-3 0.15 -1" color="#32CD32" width="0.18" height="0.28" depth="0.18" pickup-plants></a-box>
+      <a-box position="5 0.15 -4" color="#228B22" width="0.22" height="0.32" depth="0.2" pickup-plants></a-box>
+      <a-box position="-5 0.15 3" color="#228B22" width="0.2" height="0.3" depth="0.2" pickup-plants></a-box>
+      <a-box position="1 0.15 7" color="#2CB428" width="0.19" height="0.29" depth="0.19" pickup-plants></a-box>
+      <a-box position="-2 0.15 -7" color="#32CD32" width="0.21" height="0.31" depth="0.2" pickup-plants></a-box>
+      <a-box position="7 0.15 2" color="#228B22" width="0.2" height="0.3" depth="0.2" pickup-plants></a-box>
+      <a-box position="-7 0.15 -2" color="#2CB428" width="0.18" height="0.28" depth="0.18" pickup-plants></a-box>
+      <a-box position="3 0.15 -9" color="#228B22" width="0.2" height="0.3" depth="0.2" pickup-plants></a-box>
+      <a-box position="-4 0.15 5" color="#32CD32" width="0.22" height="0.32" depth="0.2" pickup-plants></a-box>
+      
+      <!-- Luz ambiental (noche) -->
+      <a-light type="ambient" color="#333333" intensity="0.2"></a-light>
+      
+      <!-- Luz direccional (luna) -->
+      <a-light 
+        type="directional" 
+        color="#ccccff" 
+        intensity="0.3" 
+        position="-5 15 10">
+      </a-light>
+      
+      <!-- Cámara con controles -->
+      <a-entity camera position="0 1.6 0" look-controls wasd-controls></a-entity>
+      
+    </a-scene>
+  </body>
+</html>
