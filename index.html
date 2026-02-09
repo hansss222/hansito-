@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>AR Business Card - Hans Diaz</title>
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <style>
+    .github-corner:hover .octo-arm {
+      animation: octocat-wave 560ms ease-in-out
+    }
+
+    @keyframes octocat-wave {
+
+      0%,
+      100% {
+        transform: rotate(0)
+      }
+
+      20%,
+      60% {
+        transform: rotate(-25deg)
+      }
+
+      40%,
+      80% {
+        transform: rotate(10deg)
+      }
+    }
+
+    @media (max-width:500px) {
+      .github-corner:hover .octo-arm {
+        animation: none
+      }
+
+      .github-corner .octo-arm {
+        animation: octocat-wave 560ms ease-in-out
+      }
+    }
+  </style>
+  <script>
+    AFRAME.registerComponent('navigate-on-click', {
+      schema: {
+        url: { default: '' }
+      },
+      init: function () {
+        var data = this.data;
+        var el = this.el;
+
+        el.addEventListener('click', function () {
+          // Check if it's a valid URL before navigating
+          if (data.url && data.url.startsWith('http')) {
+            window.open(data.url, '_blank');
+          } else {
+            console.log("Clicked! URL placeholder: " + data.url);
+            alert("Opening: " + data.url);
+          }
+        });
+
+        // Add simple hover animation setup
+        el.addEventListener('mouseenter', function () {
+          el.setAttribute('scale', { x: 1.2, y: 1.2, z: 1.2 });
+          el.setAttribute('color', '#FFD700'); // Gold on hover
+        });
+        el.addEventListener('mouseleave', function () {
+          el.setAttribute('scale', { x: 1, y: 1, z: 1 });
+          el.setAttribute('color', el.getAttribute('original-color'));
+        });
+      }
+    });
+  </script>
+</head>
+
+<body style="margin: 0; overflow: hidden;">
+  <a-scene embedded
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
+
+    <a-assets>
+      <img id="profile-texture" src="https://i.imgur.com/mYmmbrp.jpg">
+      <img id="icon-instagram"
+        src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Instagram_logo_2016.svg/800px-Instagram_logo_2016.svg.png">
+      <img id="icon-facebook"
+        src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/2021_Facebook_icon.svg/800px-2021_Facebook_icon.svg.png">
+      <img id="icon-linkedin"
+        src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/LinkedIn_logo_initials.png/800px-LinkedIn_logo_initials.png">
+
+      <!-- Asset del modelo 3D (Avatar) -->
+      <a-asset-item id="avatar-model" src="source/avatar.glb"></a-asset-item>
+    </a-assets>
+
+    <a-marker preset="hiro">
+
+      <!-- Name Text -->
+      <a-text value="Hans Diaz" position="0 1.8 0" align="center" color="#000000" scale="1.5 1.5 1.5"
+        rotation="-90 0 0">
+      </a-text>
+
+      <!-- Avatar 3D Model -->
+      <a-gltf-model src="#avatar-model" position="0 0 0" rotation="-90 0 0" scale="1.5 1.5 1.5"
+        animation="property: rotation; to: -90 360 0; loop: true; dur: 10000; easing: linear">
+      </a-gltf-model>
+
+      <!-- Flying Figures (Decorations) -->
+      <!-- Anillo Dorado Giratorio -->
+      <a-torus position="0 0.5 0" radius="1.2" radius-tubular="0.03" color="#FFD700" rotation="90 0 0"
+        animation="property: rotation; to: 90 360 0; loop: true; dur: 3000; easing: linear">
+      </a-torus>
+
+      <!-- Dodecaedro Rojo (Flotando) -->
+      <a-dodecahedron color="#FF4500" radius="0.3" position="1.2 1 0"
+        animation="property: position; from: 1.2 1 0; to: 1.2 1.5 0; dir: alternate; loop: true; dur: 1000">
+      </a-dodecahedron>
+
+      <!-- Icosaedro Azul (Girando) -->
+      <a-icosahedron color="#00BFFF" radius="0.3" position="-1.2 1 0"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 2000; easing: linear">
+      </a-icosahedron>
+
+      <!-- Floating Social Icons Group -->
+      <!-- Distributed around the cube -->
+
+      <!-- Instagram Icon (Left) -->
+      <a-entity position="-1.5 0.5 0" rotation="-90 0 0" navigate-on-click="url: https://instagram.com">
+        <a-circle radius="0.4" material="src: #icon-instagram; opacity: 1; transparent: true" class="clickable">
+        </a-circle>
+        <a-text value="Instagram" align="center" position="0 -0.6 0" color="black" scale="0.8 0.8 0.8"></a-text>
+      </a-entity>
+
+      <!-- Facebook Icon (Center Front) -->
+      <a-entity position="0 0.5 1.5" rotation="-90 0 0" navigate-on-click="url: https://facebook.com">
+        <a-circle radius="0.4" material="src: #icon-facebook; opacity: 1; transparent: true" class="clickable">
+        </a-circle>
+        <a-text value="Facebook" align="center" position="0 -0.6 0" color="black" scale="0.8 0.8 0.8"></a-text>
+      </a-entity>
+
+      <!-- LinkedIn Icon (Right) -->
+      <a-entity position="1.5 0.5 0" rotation="-90 0 0" navigate-on-click="url: https://linkedin.com">
+        <a-circle radius="0.4" material="src: #icon-linkedin; opacity: 1; transparent: true" class="clickable">
+        </a-circle>
+        <a-text value="LinkedIn" align="center" position="0 -0.6 0" color="black" scale="0.8 0.8 0.8"></a-text>
+      </a-entity>
+
+    </a-marker>
+
+    <!-- Camera with cursor for interaction -->
+    <a-entity camera>
+      <a-cursor fuse="false" raycaster="objects: .clickable" color="yellow"></a-cursor>
+    </a-entity>
+
+  </a-scene>
+</body>
+
+</html>
